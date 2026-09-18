@@ -38,6 +38,10 @@ function actualizarUI() {
     document.getElementById('count-vallas').innerText = state.vallas;
     document.getElementById('count-bombonas').innerText = state.bombonas;
     document.getElementById('count-maletas').innerText = state.maletas;
+    
+    // Calcular y actualizar el total
+    const total = state.vallas + state.bombonas + state.maletas;
+    document.getElementById('count-total').innerText = total;
 }
 
 function reiniciarRecorrido() {
