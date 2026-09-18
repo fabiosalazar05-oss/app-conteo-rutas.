@@ -51,7 +51,7 @@ function reiniciarRecorrido() {
     actualizarUI();
     
     // Limpiar marcadores del mapa
-    markers.forEach(marker => map.removeLayer(marker));
+    markers.forEach(m => map.removeLayer(m.marker || m));
     markers = [];
 }
 
@@ -98,45 +98,89 @@ function registrarAccion(item, accionType) {
         return;
     }
 
-    // Lógica matemática
     if (accionType === 'dejar') {
         state[item]++;
+        const nuevaAccion = {
+            id: Date.now() + Math.random(),
+            item: item,
+            accion: 'dejar',
+            lat: currentLocation.lat,
+            lng: currentLocation.lng,
+            timestamp: new Date().toISOString()
+        };
+        state.acciones.push(nuevaAccion);
+        agregarMarcadorAlMapa(nuevaAccion);
     } else if (accionType === 'recoger') {
         if (state[item] > 0) {
-            state[item]--;
+            // Buscar todos los elementos "dejar" de este tipo
+            let dejados = state.acciones.filter(a => a.item === item && a.accion === 'dejar');
+            if (dejados.length > 0) {
+                // Encontrar el más cercano a la ubicación actual
+                let masCercano = dejados[0];
+                let menorDistancia = Infinity;
+                
+                dejados.forEach(a => {
+                    let dx = a.lat - currentLocation.lat;
+                    let dy = a.lng - currentLocation.lng;
+                    let distancia = Math.sqrt(dx*dx + dy*dy);
+                    if (distancia < menorDistancia) {
+                        menorDistancia = distancia;
+                        masCercano = a;
+                    }
+                });
+
+                // Eliminarlo del estado
+                state.acciones = state.acciones.filter(a => a.id !== masCercano.id && a !== masCercano);
+                
+                // Eliminar el marcador visualmente
+                let indexMarcador = markers.findIndex(m => m.accionId === masCercano.id || (m.accion === masCercano));
+                if (indexMarcador !== -1) {
+                    map.removeLayer(markers[indexMarcador].marker);
+                    markers.splice(indexMarcador, 1);
+                }
+
+                state[item]--;
+            }
         } else {
             alert(`No puedes recoger ${item} porque el contador está en 0.`);
             return;
         }
     }
 
-    const nuevaAccion = {
-        item: item,
-        accion: accionType,
-        lat: currentLocation.lat,
-        lng: currentLocation.lng,
-        timestamp: new Date().toISOString()
-    };
-
-    state.acciones.push(nuevaAccion);
     guardarEstado();
     actualizarUI();
-    agregarMarcadorAlMapa(nuevaAccion);
     
-    // Centrar mapa en la nueva acción
+    // Centrar mapa en la ubicación actual
     map.setView([currentLocation.lat, currentLocation.lng], 16);
 }
 
 function agregarMarcadorAlMapa(accion) {
-    let color = accion.accion === 'dejar' ? 'green' : 'orange';
-    let label = accion.accion === 'dejar' ? 'Dejó' : 'Recogió';
+    // Si la acción no tiene ID (de un estado anterior), se lo asignamos
+    if (!accion.id) {
+        accion.id = Date.now() + Math.random();
+    }
+    
+    // Solo mostramos marcadores de lo que se ha "dejado"
+    if (accion.accion !== 'dejar') return;
+
+    // Asignar un color distinto dependiendo del tipo de elemento
+    let color = '#27ae60'; // Verde por defecto
+    if (accion.item === 'vallas') {
+        color = '#3498db'; // Azul para vallas
+    } else if (accion.item === 'bombonas') {
+        color = '#e74c3c'; // Rojo para bombonas
+    } else if (accion.item === 'maletas') {
+        color = '#9b59b6'; // Morado para maletas
+    }
+    
+    let label = 'Dejó';
     
     // Crear un icono simple coloreado usando HTML/CSS
     const icon = L.divIcon({
         className: 'custom-icon',
-        html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
+        html: `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
     });
 
     const timeString = new Date(accion.timestamp).toLocaleTimeString();
@@ -145,5 +189,5 @@ function agregarMarcadorAlMapa(accion) {
         .addTo(map)
         .bindPopup(`<b>${label} ${accion.item}</b><br>Hora: ${timeString}`);
         
-    markers.push(marker);
+    markers.push({ marker: marker, accionId: accion.id, accion: accion });
 }
