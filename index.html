@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>App Conteo Rutas</title>
+    <link rel="manifest" href="manifest.json">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <h1>Ruta Activa</h1>
+            <button id="btn-nuevo-recorrido" class="btn-danger">Nuevo Recorrido</button>
+        </header>
+
+        <!-- Contenedor del Mapa -->
+        <div id="map-container">
+            <div id="map"></div>
+        </div>
+
+        <!-- Contenedores de Inventario -->
+        <div class="inventory-container">
+            <h2>Inventario en Ruta</h2>
+            
+            <!-- Vallas -->
+            <div class="item-card">
+                <div class="item-info">
+                    <span class="item-name">Vallas</span>
+                    <span class="item-count" id="count-vallas">0</span>
+                </div>
+                <div class="item-actions">
+                    <button class="btn-dejar" onclick="registrarAccion('vallas', 'dejar')">Dejar (+)</button>
+                    <button class="btn-recoger" onclick="registrarAccion('vallas', 'recoger')">Recoger (-)</button>
+                </div>
+            </div>
+
+            <!-- Bombonas -->
+            <div class="item-card">
+                <div class="item-info">
+                    <span class="item-name">Bombonas</span>
+                    <span class="item-count" id="count-bombonas">0</span>
+                </div>
+                <div class="item-actions">
+                    <button class="btn-dejar" onclick="registrarAccion('bombonas', 'dejar')">Dejar (+)</button>
+                    <button class="btn-recoger" onclick="registrarAccion('bombonas', 'recoger')">Recoger (-)</button>
+                </div>
+            </div>
+
+            <!-- Maletas -->
+            <div class="item-card">
+                <div class="item-info">
+                    <span class="item-name">Maletas</span>
+                    <span class="item-count" id="count-maletas">0</span>
+                </div>
+                <div class="item-actions">
+                    <button class="btn-dejar" onclick="registrarAccion('maletas', 'dejar')">Dejar (+)</button>
+                    <button class="btn-recoger" onclick="registrarAccion('maletas', 'recoger')">Recoger (-)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- App Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
