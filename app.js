@@ -43,6 +43,15 @@ function cargarEstado() {
 
 function guardarEstado() {
     localStorage.setItem('appConteoState', JSON.stringify(state));
+    
+    // Mostrar indicador de autoguardado
+    const indicator = document.getElementById('save-indicator');
+    if (indicator) {
+        indicator.style.opacity = '1';
+        setTimeout(() => {
+            indicator.style.opacity = '0';
+        }, 2000);
+    }
 }
 
 function actualizarUI() {
