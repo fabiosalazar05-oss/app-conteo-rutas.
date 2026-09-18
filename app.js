@@ -48,9 +48,13 @@ function guardarEstado() {
 function actualizarUI() {
     const items = ['vallas', 'bombonas', 'maletas'];
     items.forEach(item => {
-        document.getElementById(`count-${item}-enruta`).innerText = state[item].enRuta;
-        document.getElementById(`count-${item}-dejadas`).innerText = state[item].dejadas;
-        document.getElementById(`count-${item}-recogidas`).innerText = state[item].recogidas;
+        let elEnRuta = document.getElementById(`count-${item}-enruta`);
+        let elDejadas = document.getElementById(`count-${item}-dejadas`);
+        let elRecogidas = document.getElementById(`count-${item}-recogidas`);
+        
+        if (elEnRuta) elEnRuta.innerText = state[item].enRuta;
+        if (elDejadas) elDejadas.innerText = state[item].dejadas;
+        if (elRecogidas) elRecogidas.innerText = state[item].recogidas;
     });
 }
 
