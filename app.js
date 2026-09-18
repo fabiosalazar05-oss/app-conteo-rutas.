@@ -1,9 +1,9 @@
 // Estado de la aplicación
 let state = {
-    vallas: 0,
-    bombonas: 0,
-    maletas: 0,
-    acciones: [] // Guarda { item, accion, lat, lng, timestamp }
+    vallas: { enRuta: 0, dejadas: 0, recogidas: 0 },
+    bombonas: { enRuta: 0, dejadas: 0, recogidas: 0 },
+    maletas: { enRuta: 0, dejadas: 0, recogidas: 0 },
+    acciones: [] // Guarda { id, item, accion, lat, lng, timestamp }
 };
 
 let map;
@@ -26,7 +26,18 @@ document.addEventListener('DOMContentLoaded', () => {
 function cargarEstado() {
     const savedState = localStorage.getItem('appConteoState');
     if (savedState) {
-        state = JSON.parse(savedState);
+        let parsed = JSON.parse(savedState);
+        // Migración de formato antiguo a nuevo si es necesario
+        if (typeof parsed.vallas === 'number') {
+            state = {
+                vallas: { enRuta: parsed.vallas, dejadas: parsed.vallas, recogidas: 0 },
+                bombonas: { enRuta: parsed.bombonas, dejadas: parsed.bombonas, recogidas: 0 },
+                maletas: { enRuta: parsed.maletas, dejadas: parsed.maletas, recogidas: 0 },
+                acciones: parsed.acciones || []
+            };
+        } else {
+            state = parsed;
+        }
     }
 }
 
@@ -35,20 +46,19 @@ function guardarEstado() {
 }
 
 function actualizarUI() {
-    document.getElementById('count-vallas').innerText = state.vallas;
-    document.getElementById('count-bombonas').innerText = state.bombonas;
-    document.getElementById('count-maletas').innerText = state.maletas;
-    
-    // Calcular y actualizar el total
-    const total = state.vallas + state.bombonas + state.maletas;
-    document.getElementById('count-total').innerText = total;
+    const items = ['vallas', 'bombonas', 'maletas'];
+    items.forEach(item => {
+        document.getElementById(`count-${item}-enruta`).innerText = state[item].enRuta;
+        document.getElementById(`count-${item}-dejadas`).innerText = state[item].dejadas;
+        document.getElementById(`count-${item}-recogidas`).innerText = state[item].recogidas;
+    });
 }
 
 function reiniciarRecorrido() {
     state = {
-        vallas: 0,
-        bombonas: 0,
-        maletas: 0,
+        vallas: { enRuta: 0, dejadas: 0, recogidas: 0 },
+        bombonas: { enRuta: 0, dejadas: 0, recogidas: 0 },
+        maletas: { enRuta: 0, dejadas: 0, recogidas: 0 },
         acciones: []
     };
     guardarEstado();
@@ -103,7 +113,8 @@ function registrarAccion(item, accionType) {
     }
 
     if (accionType === 'dejar') {
-        state[item]++;
+        state[item].enRuta++;
+        state[item].dejadas++;
         const nuevaAccion = {
             id: Date.now() + Math.random(),
             item: item,
@@ -115,7 +126,7 @@ function registrarAccion(item, accionType) {
         state.acciones.push(nuevaAccion);
         agregarMarcadorAlMapa(nuevaAccion);
     } else if (accionType === 'recoger') {
-        if (state[item] > 0) {
+        if (state[item].enRuta > 0) {
             // Buscar todos los elementos "dejar" de este tipo
             let dejados = state.acciones.filter(a => a.item === item && a.accion === 'dejar');
             if (dejados.length > 0) {
@@ -133,20 +144,21 @@ function registrarAccion(item, accionType) {
                     }
                 });
 
-                // Eliminarlo del estado
+                // Eliminarlo del estado de acciones del mapa
                 state.acciones = state.acciones.filter(a => a.id !== masCercano.id && a !== masCercano);
                 
                 // Eliminar el marcador visualmente
                 let indexMarcador = markers.findIndex(m => m.accionId === masCercano.id || (m.accion === masCercano));
                 if (indexMarcador !== -1) {
-                    map.removeLayer(markers[indexMarcador].marker);
+                    map.removeLayer(markers[indexMarcador].marker || markers[indexMarcador]);
                     markers.splice(indexMarcador, 1);
                 }
 
-                state[item]--;
+                state[item].enRuta--;
+                state[item].recogidas++;
             }
         } else {
-            alert(`No puedes recoger ${item} porque el contador está en 0.`);
+            alert(`No puedes recoger ${item} porque no hay ninguna en ruta.`);
             return;
         }
     }

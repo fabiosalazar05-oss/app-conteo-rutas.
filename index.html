@@ -25,20 +25,16 @@
         <!-- Contenedores de Inventario -->
         <div class="inventory-container">
             <h2>Inventario en Ruta</h2>
-            
-            <!-- Contador Total -->
-            <div class="item-card" style="background-color: #2c3e50; color: white; text-align: center; border-radius: 8px; margin-bottom: 20px;">
-                <div class="item-info" style="justify-content: center; margin-bottom: 0; padding: 10px;">
-                    <span class="item-name" style="font-size: 1.4rem;">Total Elementos:</span>
-                    <span class="item-count" id="count-total" style="background: white; color: #2c3e50; margin-left: 15px; font-size: 1.6rem;">0</span>
-                </div>
-            </div>
 
             <!-- Vallas -->
             <div class="item-card">
-                <div class="item-info">
+                <div class="item-header">
                     <span class="item-name">Vallas</span>
-                    <span class="item-count" id="count-vallas">0</span>
+                    <span class="item-count" id="count-vallas-enruta">0</span>
+                </div>
+                <div class="item-stats">
+                    <span>Total Dejadas: <b id="count-vallas-dejadas">0</b></span> | 
+                    <span>Total Recogidas: <b id="count-vallas-recogidas">0</b></span>
                 </div>
                 <div class="item-actions">
                     <button class="btn-dejar" onclick="registrarAccion('vallas', 'dejar')">Dejar (+)</button>
@@ -48,9 +44,13 @@
 
             <!-- Bombonas -->
             <div class="item-card">
-                <div class="item-info">
+                <div class="item-header">
                     <span class="item-name">Bombonas</span>
-                    <span class="item-count" id="count-bombonas">0</span>
+                    <span class="item-count" id="count-bombonas-enruta">0</span>
+                </div>
+                <div class="item-stats">
+                    <span>Total Dejadas: <b id="count-bombonas-dejadas">0</b></span> | 
+                    <span>Total Recogidas: <b id="count-bombonas-recogidas">0</b></span>
                 </div>
                 <div class="item-actions">
                     <button class="btn-dejar" onclick="registrarAccion('bombonas', 'dejar')">Dejar (+)</button>
@@ -60,9 +60,13 @@
 
             <!-- Maletas -->
             <div class="item-card">
-                <div class="item-info">
+                <div class="item-header">
                     <span class="item-name">Maletas</span>
-                    <span class="item-count" id="count-maletas">0</span>
+                    <span class="item-count" id="count-maletas-enruta">0</span>
+                </div>
+                <div class="item-stats">
+                    <span>Total Dejadas: <b id="count-maletas-dejadas">0</b></span> | 
+                    <span>Total Recogidas: <b id="count-maletas-recogidas">0</b></span>
                 </div>
                 <div class="item-actions">
                     <button class="btn-dejar" onclick="registrarAccion('maletas', 'dejar')">Dejar (+)</button>
