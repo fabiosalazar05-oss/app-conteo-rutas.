@@ -140,22 +140,30 @@ function registrarAccion(item, accionType) {
         agregarMarcadorAlMapa(nuevaAccion);
     } else if (accionType === 'recoger') {
         if (state[item].enRuta > 0) {
-            // Buscar todos los elementos "dejar" de este tipo
             let dejados = state.acciones.filter(a => a.item === item && a.accion === 'dejar');
             if (dejados.length > 0) {
-                // Encontrar el más cercano a la ubicación actual
                 let masCercano = dejados[0];
                 let menorDistancia = Infinity;
                 
+                let currentLatLng = L.latLng(currentLocation.lat, currentLocation.lng);
+                
                 dejados.forEach(a => {
-                    let dx = a.lat - currentLocation.lat;
-                    let dy = a.lng - currentLocation.lng;
-                    let distancia = Math.sqrt(dx*dx + dy*dy);
+                    let aLatLng = L.latLng(a.lat, a.lng);
+                    // Leaflet distanceTo devuelve la distancia en metros
+                    let distancia = currentLatLng.distanceTo(aLatLng);
                     if (distancia < menorDistancia) {
                         menorDistancia = distancia;
                         masCercano = a;
                     }
                 });
+                
+                // Radio permitido en metros
+                const MAX_DISTANCIA_METROS = 4;
+
+                if (menorDistancia > MAX_DISTANCIA_METROS) {
+                    alert(`Estás a ${Math.round(menorDistancia)} metros del elemento más cercano. Debes acercarte a menos de ${MAX_DISTANCIA_METROS} metros para recogerlo.`);
+                    return;
+                }
 
                 // Eliminarlo del estado de acciones del mapa
                 state.acciones = state.acciones.filter(a => a.id !== masCercano.id && a !== masCercano);
@@ -204,19 +212,26 @@ function agregarMarcadorAlMapa(accion) {
     
     let label = 'Dejó';
     
-    // Crear un icono simple coloreado usando HTML/CSS
+    // Determinar la imagen según el ítem
+    let imageSrc = 'valla.jpg';
+    if (accion.item === 'bombonas') imageSrc = 'bombona.jpg';
+    if (accion.item === 'maletas') imageSrc = 'maleta.jpg';
+    
+    // Crear un icono usando HTML con la imagen y el borde de color
     const icon = L.divIcon({
         className: 'custom-icon',
-        html: `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9]
+        html: `<img src="${imageSrc}" style="width: 36px; height: 36px; border-radius: 50%; border: 3px solid ${color}; background-color: white; box-shadow: 0 0 6px rgba(0,0,0,0.6); object-fit: cover;">`,
+        iconSize: [42, 42],
+        iconAnchor: [21, 21]
     });
 
     const timeString = new Date(accion.timestamp).toLocaleTimeString();
+    const latStr = accion.lat.toFixed(5);
+    const lngStr = accion.lng.toFixed(5);
     
     const marker = L.marker([accion.lat, accion.lng], {icon: icon})
         .addTo(map)
-        .bindPopup(`<b>${label} ${accion.item}</b><br>Hora: ${timeString}`);
+        .bindPopup(`<b>${label} ${accion.item}</b><br>Hora: ${timeString}<br>Coord: ${latStr}, ${lngStr}`);
         
     markers.push({ marker: marker, accionId: accion.id, accion: accion });
 }
