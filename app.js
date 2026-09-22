@@ -212,7 +212,11 @@ async function compartirReporte(index) {
                 // Verificar si el navegador soporta compartir archivos
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     shareData.files = [file];
+                } else {
+                    alert("Tu celular no permite adjuntar la foto automáticamente a WhatsApp por restricciones del navegador. Solo se enviará el texto.");
                 }
+            } else {
+                alert("Este reporte no tiene foto guardada (probablemente es de un recorrido anterior a la actualización).");
             }
 
             await navigator.share(shareData);
