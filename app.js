@@ -192,19 +192,37 @@ function renderizarHistorial() {
     });
 }
 
-function compartirReporte(index) {
+async function compartirReporte(index) {
     const ruta = state.historial[index];
-    const texto = `📍 *REPORTE DE RUTA*\n📅 Fecha: ${ruta.fecha}\n\n🚧 *Vallas:*\n- Dejadas: ${ruta.vallas.dejadas}\n- Recogidas: ${ruta.vallas.recogidas}\n\n🛢️ *Bombonas:*\n- Dejadas: ${ruta.bombonas.dejadas}\n- Recogidas: ${ruta.bombonas.recogidas}\n\n🧳 *Maletas:*\n- Dejadas: ${ruta.maletas.dejadas}\n- Recogidas: ${ruta.maletas.recogidas}\n\n_Reporte generado desde App de Conteo._`;
+    const texto = `📍 *REPORTE DE RUTA*\n📅 Fecha: ${ruta.fecha}\n\n🚧 *Vallas:* ${ruta.vallas.dejadas} dejadas, ${ruta.vallas.recogidas} recogidas\n🛢️ *Bombonas:* ${ruta.bombonas.dejadas} dejadas, ${ruta.bombonas.recogidas} recogidas\n🧳 *Maletas:* ${ruta.maletas.dejadas} dejadas, ${ruta.maletas.recogidas} recogidas\n\n_Reporte generado desde App de Conteo._`;
     
-    if (navigator.share) {
-        navigator.share({
-            title: 'Reporte de Ruta',
-            text: texto
-        }).catch(err => console.error('Error compartiendo:', err));
-    } else {
-        // Fallback para navegadores antiguos o computadoras
-        const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
-        window.open(url, '_blank');
+    try {
+        if (navigator.share) {
+            let shareData = {
+                title: 'Reporte de Ruta',
+                text: texto
+            };
+
+            // Si hay foto, convertir de Base64 a File para compartirla
+            if (ruta.foto) {
+                const response = await fetch(ruta.foto);
+                const blob = await response.blob();
+                const file = new File([blob], 'mapa_ruta.jpg', { type: 'image/jpeg' });
+                
+                // Verificar si el navegador soporta compartir archivos
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    shareData.files = [file];
+                }
+            }
+
+            await navigator.share(shareData);
+        } else {
+            // Fallback para PC
+            const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+            window.open(url, '_blank');
+        }
+    } catch (err) {
+        console.error('Error compartiendo:', err);
     }
 }
 
