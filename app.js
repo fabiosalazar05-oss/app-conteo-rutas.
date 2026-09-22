@@ -3,7 +3,8 @@ let state = {
     vallas: { enRuta: 0, dejadas: 0, recogidas: 0 },
     bombonas: { enRuta: 0, dejadas: 0, recogidas: 0 },
     maletas: { enRuta: 0, dejadas: 0, recogidas: 0 },
-    acciones: [] // Guarda { id, item, accion, lat, lng, timestamp }
+    acciones: [], // Guarda { id, item, accion, lat, lng, timestamp }
+    historial: [] // Guarda las rutas terminadas
 };
 
 let map;
@@ -17,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     inicializarMapa();
     
     document.getElementById('btn-nuevo-recorrido').addEventListener('click', () => {
-        if (confirm('¿Estás seguro de que quieres iniciar un nuevo recorrido? Se borrarán los datos actuales.')) {
+        if (confirm('¿Estás seguro de que quieres terminar la ruta actual y guardarla en el historial? El mapa se limpiará para un nuevo recorrido.')) {
             reiniciarRecorrido();
         }
     });
@@ -33,10 +34,12 @@ function cargarEstado() {
                 vallas: { enRuta: parsed.vallas, dejadas: parsed.vallas, recogidas: 0 },
                 bombonas: { enRuta: parsed.bombonas, dejadas: parsed.bombonas, recogidas: 0 },
                 maletas: { enRuta: parsed.maletas, dejadas: parsed.maletas, recogidas: 0 },
-                acciones: parsed.acciones || []
+                acciones: parsed.acciones || [],
+                historial: []
             };
         } else {
             state = parsed;
+            if (!state.historial) state.historial = [];
         }
     }
 }
@@ -67,13 +70,76 @@ function actualizarUI() {
     });
 }
 
-function reiniciarRecorrido() {
-    state = {
-        vallas: { enRuta: 0, dejadas: 0, recogidas: 0 },
-        bombonas: { enRuta: 0, dejadas: 0, recogidas: 0 },
-        maletas: { enRuta: 0, dejadas: 0, recogidas: 0 },
-        acciones: []
-    };
+async function reiniciarRecorrido() {
+    // Verificar si hay algo que guardar
+    if (state.vallas.dejadas === 0 && state.bombonas.dejadas === 0 && state.maletas.dejadas === 0) {
+        limpiarYReiniciar();
+        return;
+    }
+
+    // Cambiar texto de botón temporalmente
+    const btn = document.getElementById('btn-nuevo-recorrido');
+    const textoOriginal = btn.innerText;
+    btn.innerText = "Tomando foto...";
+    btn.disabled = true;
+
+    try {
+        // Tomar foto del mapa
+        const mapElement = document.getElementById('map');
+        const canvas = await html2canvas(mapElement, { 
+            useCORS: true,
+            allowTaint: false,
+            scale: 1 // escala 1 para no hacer la imagen demasiado pesada
+        });
+        
+        // Comprimir imagen a JPEG 60% calidad para que quepa en localStorage
+        const imagenBase64 = canvas.toDataURL('image/jpeg', 0.6);
+
+        // Guardar la ruta actual en el historial
+        const fecha = new Date().toLocaleString();
+        const resumen = {
+            fecha: fecha,
+            vallas: { ...state.vallas },
+            bombonas: { ...state.bombonas },
+            maletas: { ...state.maletas },
+            foto: imagenBase64
+        };
+        
+        state.historial.unshift(resumen);
+        
+        // Mantener solo los últimos 20 historiales para no llenar la memoria
+        if (state.historial.length > 20) {
+            state.historial.pop();
+        }
+
+    } catch (e) {
+        console.error("Error tomando la foto:", e);
+        alert("Hubo un error tomando la foto del mapa, pero los datos se guardarán igual.");
+        
+        const fecha = new Date().toLocaleString();
+        const resumen = {
+            fecha: fecha,
+            vallas: { ...state.vallas },
+            bombonas: { ...state.bombonas },
+            maletas: { ...state.maletas },
+            foto: null
+        };
+        state.historial.unshift(resumen);
+    }
+
+    btn.innerText = textoOriginal;
+    btn.disabled = false;
+    
+    limpiarYReiniciar();
+}
+
+function limpiarYReiniciar() {
+    // 2. Reiniciar contadores
+    state.vallas = { enRuta: 0, dejadas: 0, recogidas: 0 };
+    state.bombonas = { enRuta: 0, dejadas: 0, recogidas: 0 };
+    state.maletas = { enRuta: 0, dejadas: 0, recogidas: 0 };
+    state.acciones = [];
+    
     guardarEstado();
     actualizarUI();
     
@@ -81,6 +147,67 @@ function reiniciarRecorrido() {
     markers.forEach(m => map.removeLayer(m.marker || m));
     markers = [];
 }
+
+// === Lógica del Historial ===
+function abrirHistorial() {
+    document.getElementById('modal-historial').style.display = 'flex';
+    renderizarHistorial();
+}
+
+function cerrarHistorial() {
+    document.getElementById('modal-historial').style.display = 'none';
+}
+
+function renderizarHistorial() {
+    const lista = document.getElementById('historial-lista');
+    lista.innerHTML = '';
+    
+    if (state.historial.length === 0) {
+        lista.innerHTML = '<p style="text-align:center; color:#6b7280; margin-top: 20px;">Aún no hay rutas guardadas.</p>';
+        return;
+    }
+    
+    state.historial.forEach((ruta, index) => {
+        const div = document.createElement('div');
+        div.className = 'historial-card';
+        
+        let imgHTML = '';
+        if (ruta.foto) {
+            imgHTML = `<img src="${ruta.foto}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 12px; border: 1px solid #e5e7eb;">`;
+        }
+        
+        div.innerHTML = `
+            <div class="historial-fecha">Ruta: ${ruta.fecha}</div>
+            ${imgHTML}
+            <div class="historial-detalle">
+                <b>Vallas:</b> ${ruta.vallas.dejadas} dejadas, ${ruta.vallas.recogidas} recogidas<br>
+                <b>Bombonas:</b> ${ruta.bombonas.dejadas} dejadas, ${ruta.bombonas.recogidas} recogidas<br>
+                <b>Maletas:</b> ${ruta.maletas.dejadas} dejadas, ${ruta.maletas.recogidas} recogidas
+            </div>
+            <button class="btn-share" onclick="compartirReporte(${index})">
+                📲 Compartir por WhatsApp
+            </button>
+        `;
+        lista.appendChild(div);
+    });
+}
+
+function compartirReporte(index) {
+    const ruta = state.historial[index];
+    const texto = `📍 *REPORTE DE RUTA*\n📅 Fecha: ${ruta.fecha}\n\n🚧 *Vallas:*\n- Dejadas: ${ruta.vallas.dejadas}\n- Recogidas: ${ruta.vallas.recogidas}\n\n🛢️ *Bombonas:*\n- Dejadas: ${ruta.bombonas.dejadas}\n- Recogidas: ${ruta.bombonas.recogidas}\n\n🧳 *Maletas:*\n- Dejadas: ${ruta.maletas.dejadas}\n- Recogidas: ${ruta.maletas.recogidas}\n\n_Reporte generado desde App de Conteo._`;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: 'Reporte de Ruta',
+            text: texto
+        }).catch(err => console.error('Error compartiendo:', err));
+    } else {
+        // Fallback para navegadores antiguos o computadoras
+        const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+        window.open(url, '_blank');
+    }
+}
+
 
 function inicializarMapa() {
     // Inicializar mapa centrado en un punto por defecto (Cali, Colombia)
@@ -212,17 +339,12 @@ function agregarMarcadorAlMapa(accion) {
     
     let label = 'Dejó';
     
-    // Determinar la imagen según el ítem
-    let imageSrc = 'valla.jpg';
-    if (accion.item === 'bombonas') imageSrc = 'bombona.jpg';
-    if (accion.item === 'maletas') imageSrc = 'maleta.jpg';
-    
-    // Crear un icono usando HTML con la imagen y el borde de color
+    // Crear un icono usando HTML con el borde de color
     const icon = L.divIcon({
         className: 'custom-icon',
-        html: `<img src="${imageSrc}" style="width: 36px; height: 36px; border-radius: 50%; border: 3px solid ${color}; background-color: white; box-shadow: 0 0 6px rgba(0,0,0,0.6); object-fit: cover;">`,
-        iconSize: [42, 42],
-        iconAnchor: [21, 21]
+        html: `<div style="background-color: ${color}; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 6px rgba(0,0,0,0.6);"></div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
     });
 
     const timeString = new Date(accion.timestamp).toLocaleTimeString();

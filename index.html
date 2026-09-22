@@ -17,8 +17,24 @@
                 <h1>Ruta Activa</h1>
                 <span id="save-indicator" style="font-size: 0.8rem; color: #a9dfbf; opacity: 0; transition: opacity 0.5s;">Autoguardado ✓</span>
             </div>
-            <button id="btn-nuevo-recorrido" class="btn-danger">Nuevo Recorrido</button>
+            <div style="display: flex; gap: 8px;">
+                <button id="btn-historial" class="btn-secondary" onclick="abrirHistorial()">Ver Historial</button>
+                <button id="btn-nuevo-recorrido" class="btn-danger">Terminar Ruta</button>
+            </div>
         </header>
+
+        <!-- Modal de Historial -->
+        <div id="modal-historial" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Historial de Rutas</h2>
+                    <button class="btn-close" onclick="cerrarHistorial()">✕</button>
+                </div>
+                <div id="historial-lista" class="historial-lista">
+                    <!-- Las rutas pasadas se inyectarán aquí desde JavaScript -->
+                </div>
+            </div>
+        </div>
 
         <!-- Contenedor del Mapa -->
         <div id="map-container">
@@ -32,7 +48,10 @@
             <!-- Vallas -->
             <div class="item-card">
                 <div class="item-header">
-                    <span class="item-name">Vallas</span>
+                    <span class="item-name" style="display: flex; align-items: center;">
+                        <img src="valla.jpg" alt="Vallas" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; margin-right: 12px; border: 1px solid #ddd;">
+                        Vallas
+                    </span>
                     <span class="item-count" id="count-vallas-enruta">0</span>
                 </div>
                 <div class="item-stats">
@@ -48,7 +67,10 @@
             <!-- Bombonas -->
             <div class="item-card">
                 <div class="item-header">
-                    <span class="item-name">Bombonas</span>
+                    <span class="item-name" style="display: flex; align-items: center;">
+                        <img src="bombona.jpg" alt="Bombonas" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; margin-right: 12px; border: 1px solid #ddd;">
+                        Bombonas
+                    </span>
                     <span class="item-count" id="count-bombonas-enruta">0</span>
                 </div>
                 <div class="item-stats">
@@ -64,7 +86,10 @@
             <!-- Maletas -->
             <div class="item-card">
                 <div class="item-header">
-                    <span class="item-name">Maletas</span>
+                    <span class="item-name" style="display: flex; align-items: center;">
+                        <img src="maleta.jpg" alt="Maletas" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; margin-right: 12px; border: 1px solid #ddd;">
+                        Maletas
+                    </span>
                     <span class="item-count" id="count-maletas-enruta">0</span>
                 </div>
                 <div class="item-stats">
@@ -81,6 +106,8 @@
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- HTML2Canvas para tomar fotos del mapa -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <!-- App Logic -->
     <script src="app.js"></script>
 </body>
