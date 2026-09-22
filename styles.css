@@ -292,3 +292,65 @@ header h1 {
     background-color: #059669;
     transform: scale(0.98);
 }
+
+/* =========================================
+   MODO OSCURO AUTOMÁTICO (Nativo del celular)
+   ========================================= */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #111827;
+        color: #f9fafb;
+    }
+
+    .app-container {
+        background-color: #1f2937;
+        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    header {
+        background: linear-gradient(135deg, #1e3a8a, #111827);
+    }
+
+    .inventory-container {
+        background-color: #1f2937;
+        border-top: 1px solid #374151;
+    }
+
+    .inventory-container h2 {
+        color: #e5e7eb;
+    }
+
+    .item-card, .historial-card {
+        background: #374151;
+        border: 1px solid #4b5563;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+
+    .item-name, .historial-fecha {
+        color: #f9fafb;
+        border-bottom-color: #4b5563;
+    }
+
+    .item-stats {
+        background: #1f2937;
+        color: #d1d5db;
+    }
+
+    .item-count {
+        background: #1e3a8a;
+        color: #bfdbfe;
+    }
+    
+    .modal-content {
+        background: #1f2937;
+        border: 1px solid #4b5563;
+    }
+    
+    .modal-header {
+        background: linear-gradient(135deg, #111827, #1f2937);
+    }
+    
+    .historial-detalle {
+        color: #d1d5db;
+    }
+}

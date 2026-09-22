@@ -4,11 +4,13 @@ let state = {
     bombonas: { enRuta: 0, dejadas: 0, recogidas: 0 },
     maletas: { enRuta: 0, dejadas: 0, recogidas: 0 },
     acciones: [], // Guarda { id, item, accion, lat, lng, timestamp }
-    historial: [] // Guarda las rutas terminadas
+    historial: [], // Guarda las rutas terminadas
+    recorridoPath: [] // Coordenadas de la ruta actual
 };
 
 let map;
 let markers = [];
+let routePolyline;
 let currentLocation = null;
 
 // Inicialización
@@ -28,18 +30,20 @@ function cargarEstado() {
     const savedState = localStorage.getItem('appConteoState');
     if (savedState) {
         let parsed = JSON.parse(savedState);
-        // Migración de formato antiguo a nuevo si es necesario
+        // Migración
         if (typeof parsed.vallas === 'number') {
             state = {
                 vallas: { enRuta: parsed.vallas, dejadas: parsed.vallas, recogidas: 0 },
                 bombonas: { enRuta: parsed.bombonas, dejadas: parsed.bombonas, recogidas: 0 },
                 maletas: { enRuta: parsed.maletas, dejadas: parsed.maletas, recogidas: 0 },
                 acciones: parsed.acciones || [],
-                historial: []
+                historial: [],
+                recorridoPath: []
             };
         } else {
             state = parsed;
             if (!state.historial) state.historial = [];
+            if (!state.recorridoPath) state.recorridoPath = [];
         }
     }
 }
@@ -47,7 +51,6 @@ function cargarEstado() {
 function guardarEstado() {
     localStorage.setItem('appConteoState', JSON.stringify(state));
     
-    // Mostrar indicador de autoguardado
     const indicator = document.getElementById('save-indicator');
     if (indicator) {
         indicator.style.opacity = '1';
@@ -71,31 +74,26 @@ function actualizarUI() {
 }
 
 async function reiniciarRecorrido() {
-    // Verificar si hay algo que guardar
     if (state.vallas.dejadas === 0 && state.bombonas.dejadas === 0 && state.maletas.dejadas === 0) {
         limpiarYReiniciar();
         return;
     }
 
-    // Cambiar texto de botón temporalmente
     const btn = document.getElementById('btn-nuevo-recorrido');
     const textoOriginal = btn.innerText;
     btn.innerText = "Tomando foto...";
     btn.disabled = true;
 
     try {
-        // Tomar foto del mapa
         const mapElement = document.getElementById('map');
         const canvas = await html2canvas(mapElement, { 
             useCORS: true,
             allowTaint: false,
-            scale: 1 // escala 1 para no hacer la imagen demasiado pesada
+            scale: 1 
         });
         
-        // Comprimir imagen a JPEG 60% calidad para que quepa en localStorage
         const imagenBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
-        // Guardar la ruta actual en el historial
         const fecha = new Date().toLocaleString();
         const resumen = {
             fecha: fecha,
@@ -106,12 +104,9 @@ async function reiniciarRecorrido() {
         };
         
         state.historial.unshift(resumen);
-        
-        // Mantener solo los últimos 20 historiales para no llenar la memoria
         if (state.historial.length > 20) {
             state.historial.pop();
         }
-
     } catch (e) {
         console.error("Error tomando la foto:", e);
         alert("Hubo un error tomando la foto del mapa, pero los datos se guardarán igual.");
@@ -134,18 +129,20 @@ async function reiniciarRecorrido() {
 }
 
 function limpiarYReiniciar() {
-    // 2. Reiniciar contadores
     state.vallas = { enRuta: 0, dejadas: 0, recogidas: 0 };
     state.bombonas = { enRuta: 0, dejadas: 0, recogidas: 0 };
     state.maletas = { enRuta: 0, dejadas: 0, recogidas: 0 };
     state.acciones = [];
+    state.recorridoPath = [];
     
     guardarEstado();
     actualizarUI();
     
-    // Limpiar marcadores del mapa
     markers.forEach(m => map.removeLayer(m.marker || m));
     markers = [];
+    if (routePolyline) {
+        routePolyline.setLatLngs([]);
+    }
 }
 
 // === Lógica del Historial ===
@@ -203,25 +200,20 @@ async function compartirReporte(index) {
                 text: texto
             };
 
-            // Si hay foto, convertir de Base64 a File para compartirla
             if (ruta.foto) {
                 const response = await fetch(ruta.foto);
                 const blob = await response.blob();
                 const file = new File([blob], 'mapa_ruta.jpg', { type: 'image/jpeg' });
                 
-                // Verificar si el navegador soporta compartir archivos
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     shareData.files = [file];
                 } else {
                     alert("Tu celular no permite adjuntar la foto automáticamente a WhatsApp por restricciones del navegador. Solo se enviará el texto.");
                 }
-            } else {
-                alert("Este reporte no tiene foto guardada (probablemente es de un recorrido anterior a la actualización).");
             }
 
             await navigator.share(shareData);
         } else {
-            // Fallback para PC
             const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
             window.open(url, '_blank');
         }
@@ -230,27 +222,63 @@ async function compartirReporte(index) {
     }
 }
 
+function exportarExcel() {
+    if (state.historial.length === 0) {
+        alert("No hay datos en el historial para exportar.");
+        return;
+    }
+    
+    // Crear contenido CSV
+    let csvContent = "Fecha,Vallas Dejadas,Vallas Recogidas,Bombonas Dejadas,Bombonas Recogidas,Maletas Dejadas,Maletas Recogidas\n";
+    
+    state.historial.forEach(ruta => {
+        csvContent += `"${ruta.fecha}",${ruta.vallas.dejadas},${ruta.vallas.recogidas},${ruta.bombonas.dejadas},${ruta.bombonas.recogidas},${ruta.maletas.dejadas},${ruta.maletas.recogidas}\n`;
+    });
+    
+    // Crear archivo Blob
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // Crear enlace de descarga
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "reporte_rutas.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 
 function inicializarMapa() {
-    // Inicializar mapa centrado en un punto por defecto (Cali, Colombia)
     map = L.map('map').setView([3.4516, -76.5320], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Intentar obtener la ubicación real del usuario
+    // Inicializar línea de ruta (Polyline)
+    routePolyline = L.polyline(state.recorridoPath, {
+        color: '#3b82f6', // Color azul moderno
+        weight: 5,
+        opacity: 0.7,
+        lineJoin: 'round'
+    }).addTo(map);
+
     if ('geolocation' in navigator) {
         navigator.geolocation.watchPosition(
             (position) => {
-                currentLocation = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
                 
-                // Centrar el mapa en la primera carga si no hay acciones previas
-                if (state.acciones.length === 0 && markers.length === 0) {
-                    map.setView([currentLocation.lat, currentLocation.lng], 16);
+                // Actualizar ubicación actual
+                currentLocation = { lat, lng };
+                
+                // Añadir punto al trazado de la ruta
+                state.recorridoPath.push([lat, lng]);
+                routePolyline.setLatLngs(state.recorridoPath);
+                guardarEstado(); // Guardar para persistencia
+                
+                if (state.acciones.length === 0 && markers.length === 0 && state.recorridoPath.length === 1) {
+                    map.setView([lat, lng], 16);
                 }
             },
             (error) => {
@@ -262,7 +290,6 @@ function inicializarMapa() {
         alert("Tu navegador no soporta geolocalización");
     }
 
-    // Dibujar marcadores guardados
     state.acciones.forEach(accion => {
         agregarMarcadorAlMapa(accion);
     });
