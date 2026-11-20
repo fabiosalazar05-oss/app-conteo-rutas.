@@ -333,8 +333,8 @@ function registrarAccion(item, accionType) {
                     }
                 });
                 
-                // Radio permitido en metros
-                const MAX_DISTANCIA_METROS = 4;
+                // Radio permitido en metros (aproximadamente 15 metros para mejor recepción GPS)
+                const MAX_DISTANCIA_METROS = 15;
 
                 if (menorDistancia > MAX_DISTANCIA_METROS) {
                     alert(`Estás a ${Math.round(menorDistancia)} metros del elemento más cercano. Debes acercarte a menos de ${MAX_DISTANCIA_METROS} metros para recogerlo.`);
