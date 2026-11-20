@@ -12,12 +12,14 @@ let map;
 let markers = [];
 let routePolyline;
 let currentLocation = null;
+let mapaInicializado = false;
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
     cargarEstado();
     actualizarUI();
-    inicializarMapa();
+    iniciarGeolocalizacion();
+    cargarScriptGoogleMaps();
     
     document.getElementById('btn-nuevo-recorrido').addEventListener('click', () => {
         if (confirm('¿Estás seguro de que quieres terminar la ruta actual y guardarla en el historial? El mapa se limpiará para un nuevo recorrido.')) {
@@ -138,10 +140,17 @@ function limpiarYReiniciar() {
     guardarEstado();
     actualizarUI();
     
-    markers.forEach(m => map.removeLayer(m.marker || m));
+    // Eliminar marcadores del mapa
+    markers.forEach(m => {
+        if (m.marker && typeof m.marker.setMap === 'function') {
+            m.marker.setMap(null);
+        }
+    });
     markers = [];
-    if (routePolyline) {
-        routePolyline.setLatLngs([]);
+
+    // Limpiar polilínea del recorrido
+    if (routePolyline && typeof routePolyline.setPath === 'function') {
+        routePolyline.setPath([]);
     }
 }
 
@@ -248,21 +257,7 @@ function exportarExcel() {
     document.body.removeChild(link);
 }
 
-function inicializarMapa() {
-    map = L.map('map').setView([3.4516, -76.5320], 13);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    // Inicializar línea de ruta (Polyline)
-    routePolyline = L.polyline(state.recorridoPath, {
-        color: '#3b82f6', // Color azul moderno
-        weight: 5,
-        opacity: 0.7,
-        lineJoin: 'round'
-    }).addTo(map);
-
+function iniciarGeolocalizacion() {
     if ('geolocation' in navigator) {
         navigator.geolocation.watchPosition(
             (position) => {
@@ -274,25 +269,135 @@ function inicializarMapa() {
                 
                 // Añadir punto al trazado de la ruta
                 state.recorridoPath.push([lat, lng]);
-                routePolyline.setLatLngs(state.recorridoPath);
                 guardarEstado(); // Guardar para persistencia
+
+                // Si Google Maps y la polilínea ya están inicializados, actualizar ruta en vivo
+                if (routePolyline && window.google && window.google.maps) {
+                    const path = routePolyline.getPath();
+                    path.push(new google.maps.LatLng(lat, lng));
+                }
                 
-                if (state.acciones.length === 0 && markers.length === 0 && state.recorridoPath.length === 1) {
-                    map.setView([lat, lng], 16);
+                // Centrar automáticamente en el primer punto
+                if (map && state.acciones.length === 0 && markers.length === 0 && state.recorridoPath.length === 1) {
+                    map.setCenter({ lat, lng });
+                    map.setZoom(16);
                 }
             },
             (error) => {
-                console.error("Error obteniendo ubicación:", error);
+                console.error("Error obteniendo ubicación GPS:", error);
             },
-            { enableHighAccuracy: true }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     } else {
-        alert("Tu navegador no soporta geolocalización");
+        alert("Tu navegador o dispositivo no soporta geolocalización.");
+    }
+}
+
+// Captura de errores de autenticación de Google Maps (por si la API no está habilitada o hay restricciones)
+window.gm_authFailure = function() {
+    console.error("Google Maps API Key Authentication Failure");
+    mostrarAvisoApiKey("Error de autenticación con Google Maps. Asegúrate de que la <strong>'Maps JavaScript API'</strong> esté habilitada en tu consola de Google Cloud y que tu proyecto tenga la facturación activa.");
+};
+
+function cargarScriptGoogleMaps() {
+    if (typeof GOOGLE_MAPS_API_KEY === 'undefined' || !GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY === "TU_API_KEY_AQUI") {
+        mostrarAvisoApiKey();
+        return;
     }
 
+    if (window.google && window.google.maps) {
+        inicializarMapa();
+        return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry&callback=inicializarMapa`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => {
+        mostrarAvisoApiKey("Error al conectar con Google Maps. Revisa que tu API Key sea correcta y tenga habilitada la 'Maps JavaScript API'.");
+    };
+    document.head.appendChild(script);
+}
+
+function mostrarAvisoApiKey(mensajeExtra) {
+    const mapElement = document.getElementById('map');
+    if (!mapElement) return;
+    mapElement.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 24px; text-align: center; background: #f8fafc; color: #1e293b;">
+            <div style="font-size: 2.8rem; margin-bottom: 12px;">📍</div>
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 8px; color: #1e3a8a;">Integración de Google Maps Lista</h3>
+            <p style="font-size: 0.9rem; max-width: 420px; line-height: 1.5; margin-bottom: 16px; color: #475569;">
+                ${mensajeExtra || 'Para activar el mapa de Google Maps, abre el archivo <strong>config.js</strong> y pega tu API Key en la variable <code>GOOGLE_MAPS_API_KEY</code>.'}
+            </p>
+            <div style="background: #ffffff; border: 1px dashed #cbd5e1; padding: 10px 16px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: #2563eb;">
+                config.js ➔ GOOGLE_MAPS_API_KEY = "TU_KEY";
+            </div>
+        </div>
+    `;
+}
+
+window.inicializarMapa = function() {
+    if (mapaInicializado) return;
+    const mapElement = document.getElementById('map');
+    if (!mapElement || !window.google || !window.google.maps) return;
+
+    mapElement.innerHTML = '';
+    mapaInicializado = true;
+
+    // Coordenadas por defecto (Cali, Colombia) o ubicación actual si ya se obtuvo
+    const centroInicial = currentLocation 
+        ? { lat: currentLocation.lat, lng: currentLocation.lng } 
+        : { lat: 3.4516, lng: -76.5320 };
+
+    map = new google.maps.Map(mapElement, {
+        center: centroInicial,
+        zoom: 16,
+        mapTypeId: 'roadmap',
+        zoomControl: true,
+        mapTypeControl: true, // Permite alternar entre mapa normal y satélite
+        streetViewControl: false,
+        fullscreenControl: false
+    });
+
+    // Inicializar trazado de la ruta (Polyline de Google Maps)
+    const puntosRuta = state.recorridoPath.map(p => ({ lat: p[0], lng: p[1] }));
+    routePolyline = new google.maps.Polyline({
+        path: puntosRuta,
+        geodesic: true,
+        strokeColor: '#3b82f6',
+        strokeOpacity: 0.8,
+        strokeWeight: 5,
+        map: map
+    });
+
+    if (currentLocation) {
+        map.setCenter({ lat: currentLocation.lat, lng: currentLocation.lng });
+    }
+
+    // Dibujar marcadores previamente guardados
     state.acciones.forEach(accion => {
         agregarMarcadorAlMapa(accion);
     });
+};
+
+function calcularDistanciaMetros(lat1, lon1, lat2, lon2) {
+    if (window.google && window.google.maps && window.google.maps.geometry && window.google.maps.geometry.spherical) {
+        const p1 = new google.maps.LatLng(lat1, lon1);
+        const p2 = new google.maps.LatLng(lat2, lon2);
+        return google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
+    }
+    // Fórmula de Haversine de respaldo (distancia precisa en metros)
+    const R = 6371e3;
+    const phi1 = lat1 * Math.PI / 180;
+    const phi2 = lat2 * Math.PI / 180;
+    const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+    const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+              Math.cos(phi1) * Math.cos(phi2) *
+              Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
 }
 
 function registrarAccion(item, accionType) {
@@ -321,19 +426,15 @@ function registrarAccion(item, accionType) {
                 let masCercano = dejados[0];
                 let menorDistancia = Infinity;
                 
-                let currentLatLng = L.latLng(currentLocation.lat, currentLocation.lng);
-                
                 dejados.forEach(a => {
-                    let aLatLng = L.latLng(a.lat, a.lng);
-                    // Leaflet distanceTo devuelve la distancia en metros
-                    let distancia = currentLatLng.distanceTo(aLatLng);
+                    let distancia = calcularDistanciaMetros(currentLocation.lat, currentLocation.lng, a.lat, a.lng);
                     if (distancia < menorDistancia) {
                         menorDistancia = distancia;
                         masCercano = a;
                     }
                 });
                 
-                // Radio permitido en metros (aproximadamente 15 metros para mejor recepción GPS)
+                // Radio permitido en metros (15 metros)
                 const MAX_DISTANCIA_METROS = 15;
 
                 if (menorDistancia > MAX_DISTANCIA_METROS) {
@@ -347,7 +448,9 @@ function registrarAccion(item, accionType) {
                 // Eliminar el marcador visualmente
                 let indexMarcador = markers.findIndex(m => m.accionId === masCercano.id || (m.accion === masCercano));
                 if (indexMarcador !== -1) {
-                    map.removeLayer(markers[indexMarcador].marker || markers[indexMarcador]);
+                    if (markers[indexMarcador].marker && typeof markers[indexMarcador].marker.setMap === 'function') {
+                        markers[indexMarcador].marker.setMap(null);
+                    }
                     markers.splice(indexMarcador, 1);
                 }
 
@@ -364,11 +467,13 @@ function registrarAccion(item, accionType) {
     actualizarUI();
     
     // Centrar mapa en la ubicación actual
-    map.setView([currentLocation.lat, currentLocation.lng], 16);
+    if (map && typeof map.setCenter === 'function') {
+        map.setCenter({ lat: currentLocation.lat, lng: currentLocation.lng });
+        map.setZoom(16);
+    }
 }
 
 function agregarMarcadorAlMapa(accion) {
-    // Si la acción no tiene ID (de un estado anterior), se lo asignamos
     if (!accion.id) {
         accion.id = Date.now() + Math.random();
     }
@@ -376,33 +481,52 @@ function agregarMarcadorAlMapa(accion) {
     // Solo mostramos marcadores de lo que se ha "dejado"
     if (accion.accion !== 'dejar') return;
 
-    // Asignar un color distinto dependiendo del tipo de elemento
-    let color = '#27ae60'; // Verde por defecto
+    if (!map || !window.google || !window.google.maps) return;
+
+    // Asignar un color distintivo según el tipo de elemento
+    let color = '#10b981'; // Verde por defecto
     if (accion.item === 'vallas') {
-        color = '#3498db'; // Azul para vallas
+        color = '#3b82f6'; // Azul para vallas
     } else if (accion.item === 'bombonas') {
-        color = '#e74c3c'; // Rojo para bombonas
+        color = '#ef4444'; // Rojo para bombonas
     } else if (accion.item === 'maletas') {
-        color = '#9b59b6'; // Morado para maletas
+        color = '#8b5cf6'; // Morado para maletas
     }
     
     let label = 'Dejó';
-    
-    // Crear un icono usando HTML con el borde de color
-    const icon = L.divIcon({
-        className: 'custom-icon',
-        html: `<div style="background-color: ${color}; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 6px rgba(0,0,0,0.6);"></div>`,
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
-    });
-
     const timeString = new Date(accion.timestamp).toLocaleTimeString();
     const latStr = accion.lat.toFixed(5);
     const lngStr = accion.lng.toFixed(5);
-    
-    const marker = L.marker([accion.lat, accion.lng], {icon: icon})
-        .addTo(map)
-        .bindPopup(`<b>${label} ${accion.item}</b><br>Hora: ${timeString}<br>Coord: ${latStr}, ${lngStr}`);
+
+    // Marcador circular personalizado en Google Maps
+    const marker = new google.maps.Marker({
+        position: { lat: accion.lat, lng: accion.lng },
+        map: map,
+        title: `${label} ${accion.item}`,
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: color,
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2.5
+        }
+    });
+
+    // Ventana de información (Popup) al hacer clic
+    const infoWindow = new google.maps.InfoWindow({
+        content: `
+            <div style="padding: 4px; font-family: sans-serif; font-size: 13px; color: #1e293b;">
+                <b style="color: ${color}; font-size: 14px;">${label} ${accion.item}</b><br>
+                <span>🕒 Hora: ${timeString}</span><br>
+                <span style="color: #64748b;">📍 ${latStr}, ${lngStr}</span>
+            </div>
+        `
+    });
+
+    marker.addListener('click', () => {
+        infoWindow.open(map, marker);
+    });
         
-    markers.push({ marker: marker, accionId: accion.id, accion: accion });
+    markers.push({ marker: marker, accionId: accion.id, accion: accion, infoWindow: infoWindow });
 }
